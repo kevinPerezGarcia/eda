@@ -1,0 +1,483 @@
+---
+title: "Exploratory Data Analysis"
+author: Kevin Pérez García
+format: html
+toc: TRUE
+---
+
+## Inicialización del Proyecto
+
+### Instalación y carga de paquetes
+
+```{r}
+paquetes <- c("here", # rutas relativas
+              "MASS", # bases de datos
+              "dplyr", # manejo de base de datos
+              "ggplot2", # visualización de datos
+              "GGally", # distribuciones, boxplots, graficas de dispersion, correlaciones
+              "psych",
+              "pastecs",
+              "summarytools",
+              "reshape2", # cambiar data de forma ancha a larga y visceversa
+              " correlation", # correlaciones
+              "corrplot")
+
+lapply(paquetes, library, character.only = T)
+```
+
+### Configuración de rutas
+
+```{r}
+here_base_datos <- here("datos", "survey.csv")
+```
+
+### Funciones propias
+```{r}
+## ################################################################
+## #
+## # Create a basic summary of variables in the data frame df,
+## # a data frame with one row for each column of df giving the
+## # variable name, type, number of unique levels, the most
+## # frequent level, its frequency and corresponding fraction of
+## # records, the number of missing values and its corresponding
+## # fraction of records
+## #
+## ################################################################
+BasicSummary <- function(df, dgts = 3){
+m <- ncol(df)
+varNames <- colnames(df)
+varType <- vector("character",m)
+topLevel <- vector("character",m)
+topCount <- vector("numeric",m)
+missCount <- vector("numeric",m)
+levels <- vector("numeric", m)
+for (i in 1:m){
+ x <- df[,i]
+ varType[i] <- class(x)
+ xtab <- table(x, useNA = "ifany")
+ levels[i] <- length(xtab)
+ nums <- as.numeric(xtab)
+ maxnum <- max(nums)
+ topCount[i] <- maxnum
+ maxIndex <- which.max(nums)
+ lvls <- names(xtab)
+ topLevel[i] <- lvls[maxIndex]
+ missIndex <- which((is.na(x)) | (x == "") | (x == " "))
+ missCount[i] <- length(missIndex)
+ }
+n <- nrow(df)
+topFrac <- round(topCount/n, digits = dgts)
+missFrac <- round(missCount/n, digits = dgts)
+
+summaryFrame <- data.frame(variable = varNames, type = varType,
+levels = levels, topLevel = topLevel,
+topCount = topCount, topFrac = topFrac,
+missFreq = missCount, missFrac = missFrac)
+return(summaryFrame)
+}
+```
+
+### Cargando conjunto de datos
+```{r}
+data(survey)
+
+class(survey)
+
+mode(survey)
+
+head(survey)
+
+View(survey)
+```
+
+# Evaluación de las características generales de los conjuntos de datos
+
+```{r}
+dim(survey)
+BasicSummary(survey)
+```
+
+## Dimensión del conjunto de datos
+
+* ¿Cuántos registros tenemos?
+```{r}
+nrow(survey)
+```
+* ¿Cuántas variables?
+```{r}
+ncol(survey)
+```
+* ¿Cuántos registros y variables?
+```{r}
+dim(survey)
+```
+
+## ¿Cuáles son los nombres de las variables? ¿Son significativos?
+```{r}
+names(survey)
+
+colnames(survey)
+
+rownames(survey)
+```
+
+Variables:
+
+* `Sex`: sexo
+* `Wr.Hnd`: completar!
+
+## ¿Qué tipo (de dato) es cada variable?
+
+```{r}
+# Para todas las variables
+sapply(survey, class)
+
+# Para una variable
+class(survey$Sex)
+
+# Estructura de los datos
+str(survey)
+
+# Niveles de las variales factor
+levels(survey$Sex)
+
+# Etiquetas de las variables factor
+labels(survey$Sex)
+```
+
+## ¿Cuántos Valores únicos tiene cada variable?
+
+## ¿Qué valores ocurren con mayor frecuencia y con qué frecuencia?
+
+## ¿Hay observaciones perdidas? ¿con qué frecuencia?
+
+# Examen de las estadísticas descriptivas para cada variable
+
+## Para variables cualitativas
+
+### ¿Cuáles son las variables cualitativas?
+
+Por ejemplo:
+
+* Sex: Sexo
+* W.Hnd: Mano dominante
+* Clap: Mano encima de la otra al aplaudir
+
+#### Tabla de frecuencias
+
+##### Individuales
+
+* Absolutas
+```{r}
+table(survey$Sex)
+table(survey$W.Hnd)
+table(survey$Clap)
+```
+* Relativas
+```{r}
+prop.table(table(survey$Sex))
+prop.table(table(survey$W.Hnd))
+prop.table(table(survey$Clap))
+```
+
+##### Conjuntas
+
+* Absolutas
+```{r}
+hand_sex<-table(survey$W.Hnd,survey$Sex)
+
+clap_hand<-table(survey$Clap,survey$W.Hnd)
+```
+
+* Relativas
+```{r}
+prop.table(table(survey$W.Hnd, survey$Sex))
+```
+* Porcentuales
+```{r}
+# Respecto al total de observaciones
+prop.table(clap_hand)*100
+
+# Respecto al total de las filas
+prop.table(clap_hand,1)*100
+
+# Respecto al total de las columnas
+prop.table(clap_hand,2)*100
+```
+
+##### Totales marginales
+```{r}
+addmargins(hand_sex)
+addmargins(clap_hand)
+```
+
+#### De 3 ó más dimensiones
+```{r}
+table(survey$Clap,survey$W.Hnd,survey$Sex)
+```
+
+## Para variables cuantitativas
+
+Base de datos precargada
+```{r}
+data(iris)
+```
+
+¿Cuáles son variables cuantitativas?
+```{r}
+sapply(iris,class)
+```
+
+### Medidas de resumen
+
+#### Medidas de tendencia central
+
+* Media
+```{r}
+mean(iris$Sepal.Length)
+```
+```{r}
+sapply(iris[1:4],mean)
+```
+```{r}
+tapply(iris$Sepal.Length, iris$Species, mean)
+
+tapply(iris$Sepal.Length, iris$Species, quantile)
+```
+
+* Mediana
+```{r}
+median(iris$Sepal.Length)
+```
+
+
+#### Medidas de dispersión
+
+* Desviación estándar
+```{r}
+sd(iris$Sepal.Length)
+```
+* Coeficiente de variación
+```{r}
+sd(iris$Sepal.Length) / mean(iris$Sepal.Length)
+```
+* Rango
+```{r}
+range(iris$Sepal.Length)
+```
+* Rango intercuartílico
+```{r}
+IQR(iris$Sepal.Length)
+```
+
+#### Medidas de posición
+
+* Máximo
+```{r}
+max(iris$Sepal.Length)
+```
+* Mínimo
+```{r}
+min(iris$Sepal.Length)
+```
+* Cuartiles
+```{r}
+quantile(iris$Sepal.Length)
+```
+* Cuantiles
+```{r}
+quantile(iris$Sepal.Length, 0.25)
+
+quantile(iris$Sepal.Length,0.10)
+```
+
+#### Varias medidas
+```{r}
+summary(iris)
+```
+```{r}
+pastecs::stat.desc(iris)
+```
+```{r}
+psych::describe(iris)
+```
+```{r}
+psych::describe.by(iris, group=iris$Species)
+```
+```{r}
+#summarytools::
+view(dfSummary(iris))
+```
+
+
+# Visualizaciones exploratorias
+
+## Para variables cualitativas
+
+### Gráfico de barras
+
+1. Filtrando observaciones
+```{r}
+database <- filter(survey, !is.na(W.Hnd),!is.na(Sex),!is.na(Clap))
+```
+
+1. Gráfico
+```{r}
+# Una encima de otra
+ggplot(database, aes(x=W.Hnd,fill=Sex)) + geom_bar(position="dodge")
+
+# Una al lado de otra
+ggplot(database, aes(x=W.Hnd,fill=Sex)) + geom_bar()
+```
+
+## Para variables cuantitativas
+
+### Histograma
+
+* Para una variable
+```{r}
+ggplot(iris,
+       aes(Petal.Length,fill=Species,y=..density..)) +
+  geom_histogram() +
+  geom_density(alpha=0.4) +
+  facet_grid(Species~.)
+```
+
+* Para todas las variables
+
+Usaremos nuevamente al conjunto de datos iris y
+una modificacion de los datos obtenida con `melt` del paquete `reshape2`.
+
+```{r}
+iris_m<-melt(iris)
+
+head(iris_m)
+```
+
+```{r}
+ggplot(iris_m,
+       aes(value,fill=Species)) +
+  geom_density(alpha=0.4) +
+  facet_wrap(~variable)
+```
+
+### Diagramas de cajas
+```{r}
+ggplot(iris,
+       aes(y=Petal.Length,x=Species)) +
+  geom_boxplot() +
+  stat_summary(fun="mean", color="red")
+```
+
+### Diagrama de violín
+```{r}
+ggplot(iris,
+       aes(y=Petal.Length,x=Species)) +
+  geom_violin()
+```
+```{r}
+ggplot(iris_m,
+       aes(y=value,x=Species,colour=Species)) +
+  geom_violin() +
+  facet_wrap(~variable)
+```
+
+# Relaciones entre variables clave
+
+## Scatterplots between numerical variables
+
+```{r}
+plot(iris$Petal.Length, iris$Petal.Width)
+```
+* Correlación de Pearson: mide la relación lineal
+```{r}
+cor(iris$Petal.Length,iris$Petal.Width)
+```
+* Correlación no lineal: método de Spearman
+```{r}
+plot(Indometh$conc, Indometh$time)
+```
+```{r}
+cor(Indometh$conc,Indometh$time) # Pearson
+```
+```{r}
+cor(Indometh$conc,Indometh$time, method="spearman")
+```
+* Matriz de correlaciones
+```{r}
+cor(iris[1:4])
+```
+* Paquete
+```{r}
+correlation(iris)
+```
+* Gráficas de correlación
+```{r}
+corrplot(cor(iris[1:4]))
+```
+```{r}
+psych::pairs.panels(iris[1:4])
+```
+
+
+
+```{r}
+ggplot(iris,
+       aes(x = Petal.Length, y = Petal.Width)) +
+  geom_point()
+```
+
+```{r}
+ggplot(iris,
+       aes(x = Petal.Length, y = Petal.Width)) +
+  geom_point() +
+  facet_grid(Species~.) +
+  geom_smooth(method="lm",se=FALSE)
+```
+* Gráfica de dispersión para todos los pares de variables
+```{r}
+pairs(iris[,1:4], col=iris$Species)
+```
+
+```{r}
+ggpairs(iris)
+```
+```{r}
+ggpairs(iris, aes(colour = Species, alpha = 0.4))
+```
+
+
+## Bloxplots: numerical vs categorical variables
+
+```{r}
+ggplot(iris,
+       aes(y=Petal.Length,x=Species)) +
+  geom_boxplot() +
+  stat_summary(fun="mean", color="red")
+```
+
+```{r}
+ggplot(iris,
+       aes(y=Petal.Length,x=Species)) +
+  geom_violin()
+```
+```{r}
+ggplot(iris_m,
+       aes(y=value,x=Species,colour=Species)) +
+  geom_violin() +
+  facet_wrap(~variable)
+```
+
+## Mosaic plots: categorical scatterplots
+
+Las tablas de contigencia se pueden representar mediante gráficos de mosaico Con una función nativa de R (`mosaicplot()`).
+
+```{r}
+mosaicplot(t(clap_hand), # t: transponer; Tabla de contingencia
+           main= "Mano dominante y aplauso",
+           xlab="Mano dominante",
+           ylab="Mano arriba en aplauso",
+           col=c(2,3,4,5), #Colores para categorias
+           cex.axis=1.2, # Aumentar tamaño de etiquetas
+           )
+```
